@@ -24,9 +24,10 @@ library(dplyr)
 # Set the basic variables
 We first simulate N representative households from year 2009 and medium state group
 ```{r}
-N  = 450
+N  = 450*5
 T = 30
-names_df <- c("id","month","NK1", "NK2to5", "kid1age", "kid2age", "YA", "edu", "LA", "Y", "logB", "Q","Pa", "Pc", "S", "pastD", "D")
+names_df <- c("id","month","NK1", "NK2to5", "kid1age", "kid2age", "YA", "edu", "LA",
+              "Y", "logB", "Q","Pa", "Pc", "S", "pastD", "D")
 K  = length(names_df)
 df <- as.data.frame(matrix(NA,nrow = N*T,K))
 names(df) <- names_df
@@ -52,16 +53,19 @@ kid2age <- c(rep(NA,T),rep(NA,TT),seq(1:(T-TT)))
 df$kid2age <- kid2age
 
 
+
 ```
 
 # Generate the secondary variables based on the basic variables
 ```{r}
+set.seed(1234) # set seed to ensure replicability
+
 # Generate NK1 and NK25
 df$NK1 <- (df$kid1age < 13) + ifelse(df$kid2age %in% seq(1,12),1,0)
 df$NK2to5 <- (df$kid1age >= 13) + ifelse(df$kid2age %in% seq(13,48),1,0)
 
 # Generate YA
-df$YA <- pmin(df$NK1, df$NK2to5, na.rm = TRUE)
+df$YA <- pmin(df$kid1age, df$kid2age, na.rm = TRUE)
 
 # Generate Y
 df$Y <- ifelse(df$YA %in% c(1,13,25,37),1,0)
@@ -75,12 +79,14 @@ df <- df %>%
     NK1 == 0 & NK2to5 == 2 ~ 4.809471,
     NK1 == 1 & NK2to5 == 1 ~ 5.091703,
   ))
+
+
+df$Q <- rep(rnorm(N),each = T) 
 ```
 
 # Simulate take-up based on the basic and secondary variables
 ```{r}
-set.seed(1234) # set seed to ensure replicability
-df$Q <- rep(rnorm(N),each = T) 
+
 # Set the parameters
 sigma1 <- exp(0.495)
 sigma2 <- exp(-0.081)
@@ -136,16 +142,29 @@ for (i in 1:N){ # loop through all households
 
 sum(df$D)/dim(df)[1]
 
-hist(df$Pa)
-hist(df$Pc)
 ```
-# Coutnerfactual: 100% attention
-
-
 
 ```{r}
-set.seed(1234) # set seed to ensure replicability
-df$Q <- rep(rnorm(N),each = T) 
+hist(df$Pa,breaks = seq(0,1,0.05))
+hist(df$Pc,breaks = seq(0,1,0.05))
+
+mean(df$logB[df$D == 1])
+mean(df$NK1[df$D == 1])
+mean(df$YA[df$D == 1])
+mean(df$edu[df$D == 1])
+mean(df$LA[df$D == 1])
+mean(df$Q[df$D == 1])
+
+Q_NI <- df$Q[df$D == 1]
+
+Q_NI0 <- df$Q[df$D == 0]
+```
+
+# Coutnerfactual: 100% attention
+
+```{r}
+#set.seed(1234) # set seed to ensure replicability
+#df$Q <- rep(rnorm(N),each = T) 
 # Set the parameters
 sigma1 <- exp(0.495)
 sigma2 <- exp(-0.081)
@@ -201,12 +220,21 @@ for (i in 1:N){ # loop through all households
 sum(df$D)/dim(df)[1]
 ```
 
+```{r}
+mean(df$logB[df$D == 1])
+mean(df$NK1[df$D == 1])
+mean(df$YA[df$D == 1])
+mean(df$edu[df$D == 1])
+mean(df$LA[df$D == 1])
+mean(df$Q[df$D == 1])
+```
+
 
 # Counterfactual: 100% choice
 ```{r}
-set.seed(1234) # set seed to ensure replicability
+#set.seed(1234) # set seed to ensure replicability
 # Set random effect Q
-df$Q <- rep(rnorm(N),each = T) 
+#df$Q <- rep(rnorm(N),each = T) 
 
 # Set the parameters
 sigma1 <- exp(0.495)
@@ -229,7 +257,7 @@ for (i in 1:N){ # loop through all households
     pastd[t] <- d0 # record last period decision
     
     Pai[t] <- pnorm(-3.945 + 
-                   0.610*X$logB[t] 
+                   0.610 * X$logB[t] 
                  - 0.755 * ifelse(X$YA[t] > 12,1,0)
                  - 0.001 * X$LA[t]
                  - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
@@ -239,7 +267,7 @@ for (i in 1:N){ # loop through all households
     Si[t] <- max(1-d0, d0*X$Y[t])
       
     Pci[t] <- pnorm(0.908 + 
-                   0.218*X$logB[t] 
+                   0.218 * X$logB[t] 
                  - 0.504 * ifelse(X$YA[t] > 12,1,0)
                  - 0.360 * Si[t]
                  + 0.010 * Si[t] * X$LA[t]
@@ -265,20 +293,19 @@ sum(df$D)/dim(df)[1]
 ```
 # More realistic policy counterfactual
 
-Finkelstein and Notowidigto (2019) shows that the attention raising policy likely has an upper bound of 30% for SNAP.
-We will use that as a benchmark for our counterfactual studies.
+Finkelstein and Notowidigto (2019) shows that the attention raising policy likely has an upper bound of 30% for SNAP. We will use that as a benchmark for our counterfactual studies.
 
-Attention raising policy:one shot increase in attention by 30% after exit the program
-Choice inducing policy: increase choice probability by 3% for ten month when participating in the program and the child's age is between 6 to 15 month.
+Attention raising policy: one shot increase in attention by 30% after exit the program
+Choice inducing policy: increase choice probability by 1% for ten month when participating in the program and the child's age is between 1 to 30 month.
 
-# Attention raising policy
+
+# Attention raising by 30%
 
 ```{r}
-set.seed(1234) # set seed to ensure replicability
+#set.seed(1234) # set seed to ensure replicability
 # Set random effect Q
 #df$Q <- rep(c(-0.5,-0.4,-0.3,-0.2,-0.1),each = 3*3*10*T) # Let's help those with low thriftiness
-df$Q <- rep(rnorm(N),each = T) 
-
+#df$Q <- rep(rnorm(N),each = T) 
 # Set the parameters
 sigma1 <- exp(0.495)
 sigma2 <- exp(-0.081)
@@ -300,7 +327,7 @@ for (i in 1:N){ # loop through all households
     pastd[t] <- d0 # record last period decision
     
     Pai[t] <- pnorm(-3.945 + 
-                   0.610*X$logB[t] 
+                   0.610 * X$logB[t] 
                  - 0.755 * ifelse(X$YA[t] > 12,1,0)
                  - 0.001 * X$LA[t]
                  - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
@@ -310,7 +337,7 @@ for (i in 1:N){ # loop through all households
     Si[t] <- max(1-d0, d0*X$Y[t])
       
     Pci[t] <- pnorm(0.908 + 
-                   0.218*X$logB[t] 
+                   0.218 * X$logB[t] 
                  - 0.504 * ifelse(X$YA[t] > 12,1,0)
                  - 0.360 * Si[t]
                  + 0.010 * Si[t] * X$LA[t]
@@ -322,9 +349,10 @@ for (i in 1:N){ # loop through all households
   # attention raising policy intervention
     if (t >= 2){ # The intervention will only be triggered when a household exits WIC
       if (X$pastD[t-1] == 1 & X$pastD[t] == 0){
-        Pai[t] < - Pai[t] + 0.3 # attention raise by 30%
-        di[t] <- rbinom(1,1,min(Pai[t],1)) * rbinom(1,1,Pci[t]) 
-        # print(c(i,t))
+        # print(c(i,t,Pai[t]))
+        Pai[t] <- min(Pai[t] + 0.3,1) # attention raise by 30%
+        di[t] <- rbinom(1,1,Pai[t]) * rbinom(1,1,Pci[t]) 
+        #print(c(i,t,Pai[t]))
       } else {
         di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
       }
@@ -345,19 +373,214 @@ for (i in 1:N){ # loop through all households
 }
 
 sum(df$D)/dim(df)[1]
-
-hist(df$Pa)
-hist(df$Pc)
 ```
 
-# Chioce inducing policy
+```{r}
+hist(df$Pa,breaks = seq(0,1,0.05))
+hist(df$Pc,breaks = seq(0,1,0.05))
+
+mean(df$logB[df$D == 1])
+mean(df$NK1[df$D == 1])
+mean(df$YA[df$D == 1])
+mean(df$edu[df$D == 1])
+mean(df$LA[df$D == 1])
+mean(df$Q[df$D == 1])
+
+Q_AR <- df$Q[df$D == 1]
+```
+
+# Chioce inducing by an increase of 1% for 30 months
 
 ```{r}
-set.seed(1234) # set seed to ensure replicability
+#set.seed(1234) # set seed to ensure replicability
 # Set random effect Q
 #df$Q <- rep(c(-0.5,-0.4,-0.3,-0.2,-0.1),each = 3*3*10*T) # Let's help those with low thriftiness
-df$Q <- rep(rnorm(N),each = T) 
+#df$Q <- rep(rnorm(N),each = T) 
 
+# Set the parameters
+sigma1 <- exp(0.495)
+sigma2 <- exp(-0.081)
+
+
+for (i in 1:N){ # loop through all households
+  set.seed(1234) # set seed to ensure replicability
+  di <- rep(NA,T)
+  Si <- rep(NA,T)
+  Pai <- rep(NA,T)
+  Pci <- rep(NA,T)
+  pastd <- rep(NA,T)
+  
+  X <- df[df$id==i,]
+  
+  d0 = 0 # initial condition 0
+  
+  # Simulate decisions sequentially
+  for (t in 1:T){
+    pastd[t] <- d0 # record last period decision
+    
+    Pai[t] <- pnorm(-3.945 + 
+                   0.610 * X$logB[t] 
+                 - 0.755 * ifelse(X$YA[t] > 12,1,0)
+                 - 0.001 * X$LA[t]
+                 - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+                 + sigma1 * X$Q[t]
+                 ) # record attention probability
+    
+    Si[t] <- max(1-d0, d0*X$Y[t])
+      
+    Pci[t] <- pnorm(0.908 + 
+                   0.218 * X$logB[t] 
+                 - 0.504 * ifelse(X$YA[t] > 12,1,0)
+                 - 0.360 * Si[t]
+                 + 0.010 * Si[t] * X$LA[t]
+                 + 0.063 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+                 + sigma2 * X$Q[t]
+                 ) # record choice probability
+    
+    
+  # choice inducing policy intervention
+    if (X$pastD[t] == 1 & X$YA[t] >= 1 & X$YA[t] <= 30){ 
+      # The intervention will only be triggered when the household is in the program AND
+      # YA is between the 1 to 30 month
+      Pci[t] <- min(Pci[t] + 0.01,1) # choice raise by 3%
+      di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
+      # print(c(i,t))
+    } else {
+      di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
+    }
+    
+    d0 <- di[t] # update the "initial condition"
+  } 
+  
+  # fill in the data for df
+  df$pastD[df$id==i] <- pastd
+  df$D[df$id==i] <- di
+  df$Pa[df$id==i] <- Pai
+  df$Pc[df$id==i] <- Pci
+  df$S[df$id==i] <- Si
+}
+
+sum(df$D)/dim(df)[1]
+
+
+```
+
+```{r}
+hist(df$Pa,breaks = seq(0,1,0.05))
+hist(df$Pc,breaks = seq(0,1,0.05))
+
+mean(df$logB[df$D == 1])
+mean(df$NK1[df$D == 1])
+mean(df$YA[df$D == 1])
+mean(df$edu[df$D == 1])
+mean(df$LA[df$D == 1])
+mean(df$Q[df$D == 1])
+
+Q_CI <- df$Q[df$D == 1]
+```
+
+```{r}
+library(ggplot2)
+
+# Combine data into a tidy data frame (required for legends in ggplot2)
+Q_all <- data.frame(
+  Q = c(Q_NI, Q_AR, Q_CI),
+  Group = rep(c("NI", "AR", "CI"), 
+              times = c(length(Q_NI), length(Q_AR), length(Q_CI)))
+)
+  
+# Plot with legend
+ggplot(Q_all, aes(x = Q, color = Group)) +
+  geom_density(linewidth = 1.5) +
+  scale_color_manual(
+    values = c("NI" = "gray", "AR" = "blue", "CI" = "red"),
+    name = ""  # Empty legend title (remove if you want no title)
+  ) +
+  labs(x = "Random effect Q", y = "Density") +
+  theme_minimal(base_size = 20) +
+  theme(legend.position = 'top') +
+  guides(color = guide_legend(
+    override.aes = list(
+      linetype = 1,      # Solid line
+      # shape = NA,        # Remove points (set to `NA`)
+      linewidth = 2    # Adjust line thickness in legend
+    )
+  ))
+```
+
+
+```{r}
+# Define color scheme
+cols <- c("NI" = "gray", "AR" = "blue", "CI" = "red")
+
+# Create combined dataframe (ordered by desired appearance)
+plot_data <- rbind(
+  data.frame(Q = Q_NI, Group = "NI"),
+  data.frame(Q = Q_AR, Group = "AR"),
+  data.frame(Q = Q_CI, Group = "CI")
+)
+
+# Base plot setup
+base_plot <- ggplot() +
+  scale_color_manual(values = cols) +
+  labs(x = "Random effect Q", y = "Density") +
+  theme_minimal(base_size = 20) +
+  xlim(-2, 3.5) + ylim(0, 0.8) +
+  theme(legend.position = "none")
+
+# Build plots with explicit layer order
+p2 <- base_plot +
+  geom_density(
+    data = subset(plot_data, Group == "NI"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  )
+
+p3 <- base_plot +
+  geom_density(
+    data = subset(plot_data, Group == "NI"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  ) +
+  geom_density(
+    data = subset(plot_data, Group == "AR"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  )
+
+p4 <- base_plot +
+  geom_density(
+    data = subset(plot_data, Group == "NI"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  ) +
+  geom_density(
+    data = subset(plot_data, Group == "AR"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  ) +
+  geom_density(
+    data = subset(plot_data, Group == "CI"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  )
+
+p2
+p3
+p4
+
+# # Display plots
+# (p1 | p2) / (p3 | p4)
+```
+
+# Attention raising for those who never participated before to 100%
+
+This resembles the intervention by Finkelstein and Notowidigto (2019).
+It might be too expensive for WIC to implement this policy, though.
+
+```{r}
+#set.seed(1234) # set seed to ensure replicability
+#df$Q <- rep(rnorm(N),each = T) 
 # Set the parameters
 sigma1 <- exp(0.495)
 sigma2 <- exp(-0.081)
@@ -379,7 +602,7 @@ for (i in 1:N){ # loop through all households
     pastd[t] <- d0 # record last period decision
     
     Pai[t] <- pnorm(-3.945 + 
-                   0.610*X$logB[t] 
+                   0.610 * X$logB[t] 
                  - 0.755 * ifelse(X$YA[t] > 12,1,0)
                  - 0.001 * X$LA[t]
                  - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
@@ -397,20 +620,16 @@ for (i in 1:N){ # loop through all households
                  + sigma2 * X$Q[t]
                  ) # record choice probability
     
-    
-  # attention raising policy intervention
-    if (X$pastD[t] == 1 & X$YA[t] > 10 & X$YA[t] <= 20){ 
-      # The intervention will only be triggered when the household is in the program AND 
-      # YA is between the 11 to 20 month
-      Pci[t] < - Pci[t] + 0.03 # choice raise by 3%
-      di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,min(Pci[t],1))
+    # intervene when the household has never participated before
+    if(t == 1){
+      Pai[t] <- Pai[t] + 0.3
+      di[t] <- rbinom(1,1,min(Pai[t],1)) * rbinom(1,1,Pci[t])
     } else {
-      di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,min(Pci[t],1))
+      di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
     }
-    
+
     d0 <- di[t] # update the "initial condition"
-    
-  } 
+  }
   
   # fill in the data for df
   df$pastD[df$id==i] <- pastd
@@ -421,10 +640,55 @@ for (i in 1:N){ # loop through all households
 }
 
 sum(df$D)/dim(df)[1]
-
-hist(df$Pa)
-hist(df$Pc)
 ```
 
+
+
+```{r}
+# hist(df$Pa,breaks = seq(0,1,0.05))
+# hist(df$Pc,breaks = seq(0,1,0.05))
+
+mean(df$logB[df$D == 1])
+mean(df$NK1[df$D == 1])
+mean(df$YA[df$D == 1])
+mean(df$edu[df$D == 1])
+mean(df$LA[df$D == 1])
+mean(df$Q[df$D == 1])
+
+Q_FN0 <- df$Q[df$D == 0]
+```
+
+```{r}
+# Define color scheme
+cols <- c("NI0" = "gray", "FN0" = "red")
+
+# Create combined dataframe (ordered by desired appearance)
+plot_data0 <- rbind(
+  data.frame(Q = Q_NI0, Group = "NI0"),
+  data.frame(Q = Q_FN0, Group = "FN0")
+)
+
+# Base plot setup
+base_plot <- ggplot() +
+  scale_color_manual(values = cols) +
+  labs(x = "Random effect Q", y = "Density") +
+  theme_minimal(base_size = 20) +
+  xlim(-3.5, 2) + ylim(0, 0.8) +
+  theme(legend.position = "none")
+
+p0 <- base_plot +
+  geom_density(
+    data = subset(plot_data0, Group == "NI0"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  ) +
+  geom_density(
+    data = subset(plot_data0, Group == "FN0"),
+    aes(x = Q, color = Group),
+    linewidth = 1.5
+  )
+
+p0
+```
 
 
