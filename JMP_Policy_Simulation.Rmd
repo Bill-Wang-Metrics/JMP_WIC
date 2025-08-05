@@ -482,30 +482,32 @@ Q_CI <- df$Q[df$D == 1]
 ```{r}
 library(ggplot2)
 
-# Combine data into a tidy data frame (required for legends in ggplot2)
-Q_all <- data.frame(
-  Q = c(Q_NI, Q_AR, Q_CI),
-  Group = rep(c("NI", "AR", "CI"), 
-              times = c(length(Q_NI), length(Q_AR), length(Q_CI)))
-)
-  
-# Plot with legend
+
 ggplot(Q_all, aes(x = Q, color = Group)) +
   geom_density(linewidth = 1.5) +
   scale_color_manual(
     values = c("NI" = "gray", "AR" = "blue", "CI" = "red"),
-    name = ""  # Empty legend title (remove if you want no title)
+    name = ""
   ) +
   labs(x = "Random effect Q", y = "Density") +
   theme_minimal(base_size = 20) +
-  theme(legend.position = 'top') +
+  theme(
+    legend.position = 'top',
+    legend.key = element_blank(),  # Remove legend key background
+    legend.spacing.x = unit(0.5, 'cm')  # Add space between legend items
+  ) +
   guides(color = guide_legend(
     override.aes = list(
-      linetype = 1,      # Solid line
-      # shape = NA,        # Remove points (set to `NA`)
-      linewidth = 2    # Adjust line thickness in legend
-    )
+      linetype = 1.5,
+      shape = 1,         # Absolutely no shapes
+      linewidth = 1,      # Line thickness
+      fill = NA,          # No fill
+      alpha = 1,          # No transparency
+      colour = c("blue", "red", "gray")  # Explicit colors
+    ),
+    keywidth = unit(1, "cm")  # Lengthen the legend lines
   ))
+
 ```
 
 
