@@ -145,8 +145,8 @@ sum(df$D)/dim(df)[1]
 ```
 
 ```{r}
-hist(df$Pa,breaks = seq(0,1,0.05))
-hist(df$Pc,breaks = seq(0,1,0.05))
+hist(df$Pa,breaks = seq(0,1,0.05),main = "",xlab = "Attention Probability",cex.lab = 1.5,cex.axis=1.5)
+hist(df$Pc,breaks = seq(0,1,0.05),main = "",xlab = "Choice Probability",cex.lab = 1.5,cex.axis=1.5)
 
 mean(df$logB[df$D == 1])
 mean(df$NK1[df$D == 1])
@@ -158,6 +158,9 @@ mean(df$Q[df$D == 1])
 Q_NI <- df$Q[df$D == 1]
 
 Q_NI0 <- df$Q[df$D == 0]
+
+# plot average participation duration across Q
+
 ```
 
 # Coutnerfactual: 100% attention
@@ -482,8 +485,18 @@ Q_CI <- df$Q[df$D == 1]
 ```{r}
 library(ggplot2)
 
+# Define color scheme
+cols <- c("NI" = "gray", "AR" = "blue", "CI" = "red")
 
-ggplot(Q_all, aes(x = Q, color = Group)) +
+# Create combined dataframe (ordered by desired appearance)
+plot_data <- rbind(
+  data.frame(Q = Q_NI, Group = "NI"),
+  data.frame(Q = Q_AR, Group = "AR"),
+  data.frame(Q = Q_CI, Group = "CI")
+)
+
+
+ggplot(plot_data, aes(x = Q, color = Group)) +
   geom_density(linewidth = 1.5) +
   scale_color_manual(
     values = c("NI" = "gray", "AR" = "blue", "CI" = "red"),
@@ -508,6 +521,9 @@ ggplot(Q_all, aes(x = Q, color = Group)) +
     keywidth = unit(1, "cm")  # Lengthen the legend lines
   ))
 
+mean(Q_NI > 0)
+mean(Q_AR > 0)
+mean(Q_CI > 0)
 ```
 
 
@@ -625,7 +641,8 @@ for (i in 1:N){ # loop through all households
     # intervene when the household has never participated before
     if(t == 1){
       Pai[t] <- Pai[t] + 0.3
-      di[t] <- rbinom(1,1,min(Pai[t],1)) * rbinom(1,1,Pci[t])
+      Pci[t] <- Pci[t] + 0.07
+      di[t] <- rbinom(1,1,min(Pai[t],1)) * rbinom(1,1,min(Pci[t],1))
     } else {
       di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
     }
@@ -671,26 +688,30 @@ plot_data0 <- rbind(
 )
 
 # Base plot setup
-base_plot <- ggplot() +
-  scale_color_manual(values = cols) +
+ggplot(plot_data0, aes(x = Q, color = Group)) +
+  geom_density(linewidth = 1.5) +
+  scale_color_manual(
+    values = c("NI0" = "gray",  "FN0" = "red"),
+    name = ""
+  ) +
   labs(x = "Random effect Q", y = "Density") +
   theme_minimal(base_size = 20) +
-  xlim(-3.5, 2) + ylim(0, 0.8) +
-  theme(legend.position = "none")
-
-p0 <- base_plot +
-  geom_density(
-    data = subset(plot_data0, Group == "NI0"),
-    aes(x = Q, color = Group),
-    linewidth = 1.5
+  theme(
+    legend.position = 'top',
+    legend.key = element_blank(),  # Remove legend key background
+    legend.spacing.x = unit(0.5, 'cm')  # Add space between legend items
   ) +
-  geom_density(
-    data = subset(plot_data0, Group == "FN0"),
-    aes(x = Q, color = Group),
-    linewidth = 1.5
-  )
-
-p0
+  guides(color = guide_legend(
+    override.aes = list(
+      linetype = 1.5,
+      shape = 1,         # Absolutely no shapes
+      linewidth = 1.5,      # Line thickness
+      fill = NA,          # No fill
+      alpha = 1,          # No transparency
+      colour = c("red", "gray")  # Explicit colors
+    ),
+    keywidth = unit(1, "cm")  # Lengthen the legend lines
+  ))
 ```
 
 
