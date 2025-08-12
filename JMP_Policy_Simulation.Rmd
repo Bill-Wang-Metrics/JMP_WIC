@@ -44,21 +44,18 @@ df$LA <- rep(c(10,15,20),each = 3*T)
 # There are five possible initial age of kidage 1: 3,6,9,12,15
 # Half of the households have a newborn at the TT+1 month
 # Each household has at most two kids
-kid1age_initial <- rep(c(3,6,9,12,15),each = 3*3)
+kid1age_initial <- rep(c(2,4,6,8,10),each = 3*3)
 kid1age <- unlist(lapply(kid1age_initial, function(age) age + (0:(T-1))))
 df$kid1age <- kid1age
 
 TT = 12 # A second child is born in TT+1 month
 kid2age <- c(rep(NA,T),rep(NA,TT),seq(1:(T-TT)))
 df$kid2age <- kid2age
-
-
-
 ```
 
 # Generate the secondary variables based on the basic variables
 ```{r}
-set.seed(1234) # set seed to ensure replicability
+set.seed(123) # set seed to ensure replicability
 
 # Generate NK1 and NK25
 df$NK1 <- (df$kid1age < 13) + ifelse(df$kid2age %in% seq(1,12),1,0)
@@ -82,6 +79,8 @@ df <- df %>%
 
 
 df$Q <- rep(rnorm(N),each = T) 
+
+
 ```
 
 # Simulate take-up based on the basic and secondary variables
@@ -142,7 +141,13 @@ for (i in 1:N){ # loop through all households
 
 sum(df$D)/dim(df)[1]
 
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
+
+df_NI <- df
 ```
+
 
 ```{r}
 hist(df$Pa,breaks = seq(0,1,0.05),main = "",xlab = "Attention Probability",cex.lab = 1.5,cex.axis=1.5)
@@ -221,15 +226,10 @@ for (i in 1:N){ # loop through all households
 }
 
 sum(df$D)/dim(df)[1]
-```
 
-```{r}
-mean(df$logB[df$D == 1])
-mean(df$NK1[df$D == 1])
-mean(df$YA[df$D == 1])
-mean(df$edu[df$D == 1])
-mean(df$LA[df$D == 1])
-mean(df$Q[df$D == 1])
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
 ```
 
 
@@ -293,6 +293,9 @@ for (i in 1:N){ # loop through all households
 
 sum(df$D)/dim(df)[1]
 
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
 ```
 # More realistic policy counterfactual
 
@@ -376,6 +379,12 @@ for (i in 1:N){ # loop through all households
 }
 
 sum(df$D)/dim(df)[1]
+
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
+
+df_AB <- df
 ```
 
 ```{r}
@@ -388,6 +397,13 @@ mean(df$YA[df$D == 1])
 mean(df$edu[df$D == 1])
 mean(df$LA[df$D == 1])
 mean(df$Q[df$D == 1])
+
+sd(df$logB[df$D == 1])
+sd(df$NK1[df$D == 1])
+sd(df$YA[df$D == 1])
+sd(df$edu[df$D == 1])
+sd(df$LA[df$D == 1])
+sd(df$Q[df$D == 1])
 
 Q_AR <- df$Q[df$D == 1]
 ```
@@ -406,7 +422,6 @@ sigma2 <- exp(-0.081)
 
 
 for (i in 1:N){ # loop through all households
-  set.seed(1234) # set seed to ensure replicability
   di <- rep(NA,T)
   Si <- rep(NA,T)
   Pai <- rep(NA,T)
@@ -442,10 +457,10 @@ for (i in 1:N){ # loop through all households
     
     
   # choice inducing policy intervention
-    if (X$pastD[t] == 1 & X$YA[t] >= 1 & X$YA[t] <= 30){ 
+    if (X$pastD[t] == 1 & X$YA[t] <= 30){ 
       # The intervention will only be triggered when the household is in the program AND
       # YA is between the 1 to 30 month
-      Pci[t] <- min(Pci[t] + 0.01,1) # choice raise by 3%
+      Pci[t] <- min(Pci[t] + 0.01,1) # choice raise by 1%
       di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
       # print(c(i,t))
     } else {
@@ -465,8 +480,133 @@ for (i in 1:N){ # loop through all households
 
 sum(df$D)/dim(df)[1]
 
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
 
+sum(df$D[df$YA>12])/sum(df$YA>12)
+
+df_CN <- df
 ```
+```{r}
+library(dplyr)
+library(ggplot2)
+
+# Step 1: compute max_consec per household, filter Q
+result_AB <- df_AB %>%
+  group_by(id) %>%
+  summarise(
+    max_consec = {
+      runs <- rle(D)
+      if (any(runs$values == 1)) {
+        max(runs$lengths[runs$values == 1])
+      } else {
+        0
+      }
+    },
+    Q_value = first(Q),
+    Pa_value = first(Pa),
+    .groups = "drop"
+  ) %>%
+  filter(Q_value >= -2, Q_value <= 2)
+
+# Step 2: bin Q for plotting
+result_AB <- result_AB %>%
+  mutate(
+    Q_bin = cut(
+      Q_value,
+      breaks = seq(-2, 2, by = 0.2),
+      include.lowest = TRUE,
+      right = FALSE
+    )
+  )
+
+
+# Step 1: compute max_consec per household, filter Q
+result_CN <- df_CN %>%
+  group_by(id) %>%
+  summarise(
+    max_consec = {
+      runs <- rle(D)
+      if (any(runs$values == 1)) {
+        max(runs$lengths[runs$values == 1])
+      } else {
+        0
+      }
+    },
+    Q_value = first(Q),
+    Pa_value = first(Pa),
+    .groups = "drop"
+  ) %>%
+  filter(Q_value >= -2, Q_value <= 2)
+
+# Step 2: bin Q for plotting
+result_CN <- result_CN %>%
+  mutate(
+    Q_bin = cut(
+      Q_value,
+      breaks = seq(-2, 2, by = 0.2),
+      include.lowest = TRUE,
+      right = FALSE
+    )
+  )
+
+# Kernel regression plot
+plot(
+  ksmooth(result_CN$Q_value, result_CN$max_consec, kernel = "normal", bandwidth = 0.2),
+  type = "l", col = "red", lwd = 5,
+  xlim = c(-2, 2), ylim = c(0, 30),
+  xlab = "Random effect Q", ylab = "Consecutive participation",
+  cex.lab = 1.5
+)
+lines(
+  ksmooth(result_AB$Q_value, result_AB$max_consec, kernel = "normal", bandwidth = 0.2),
+  col = "blue", lwd = 5
+)
+legend("bottomright", legend = c("Choice nudge", "Attention boost"), col = c("red", "blue"), lwd = 2)
+# par(new=TRUE)
+# plot(df_NI$Q,df_NI$Pa,xlim = c(-2,2),yaxt = "n",pch = 2,ylab = "",xlab ="",cex = 0.1,col = "blue")
+# axis(4)
+# par(new=TRUE)
+# plot(df_NI$Q,df_NI$Pc,xlim = c(-2,2),yaxt = "n",pch = 2,ylab = "",xlab ="",cex = 0.1)
+
+# plot(df_CN$Q,df_CN$Pa) # same as plot(df_NI$Q,df_NI$Pa)
+```
+```{r}
+# Set up the plot area
+par(mar = c(5, 4, 4, 4) + 0.1)  # Extra space for right y-axis
+
+# First plot (Pa - left y-axis)
+plot(df_NI$Q, df_NI$Pa, 
+     xlim = c(-2, 2), ylim = c(0, 1),
+     pch = 2, cex = 0.25, col = "blue",
+     xlab = "Random Effect (Q)", ylab = "Probability",
+     cex.lab = 1.5,
+     main = "")
+
+# Add transparent pink rectangle for -1 < Q < 0.25
+rect(-1, -0.1, 0.25, 1.1, 
+     col = adjustcolor("pink", alpha.f = 0.5), border = NA)
+
+# Redraw points to ensure they're visible
+points(df_NI$Q, df_NI$Pa, pch = 2, cex = 0.25, col = "blue")
+
+# Second plot (Pc - right y-axis)
+par(new = TRUE)
+plot(df_NI$Q, df_NI$Pc, 
+     xlim = c(-2, 2), ylim = c(0, 1),
+     axes = FALSE, pch = 1, cex = 0.5, col = "red",
+     xlab = "", ylab = "")
+
+# Add right y-axis
+# axis(4)
+# mtext("Choice Probability (Pc)", side = 4, line = 3)
+
+# Add legend
+legend("bottomright", 
+       legend = c("Attention (Pa)", "Choice (Pc)"),
+       pch = c(2, 1), col = c("blue", "red"),
+       bg = "white")
+```
+
 
 ```{r}
 hist(df$Pa,breaks = seq(0,1,0.05))
@@ -524,6 +664,7 @@ ggplot(plot_data, aes(x = Q, color = Group)) +
 mean(Q_NI > 0)
 mean(Q_AR > 0)
 mean(Q_CI > 0)
+
 ```
 
 
@@ -641,7 +782,7 @@ for (i in 1:N){ # loop through all households
     # intervene when the household has never participated before
     if(t == 1){
       Pai[t] <- Pai[t] + 0.3
-      Pci[t] <- Pci[t] + 0.07
+      Pci[t] <- Pci[t] 
       di[t] <- rbinom(1,1,min(Pai[t],1)) * rbinom(1,1,min(Pci[t],1))
     } else {
       di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
@@ -713,5 +854,8 @@ ggplot(plot_data0, aes(x = Q, color = Group)) +
     keywidth = unit(1, "cm")  # Lengthen the legend lines
   ))
 ```
+
+
+
 
 
