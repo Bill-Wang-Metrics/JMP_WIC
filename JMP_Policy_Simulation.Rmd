@@ -406,7 +406,6 @@ sigma2 <- exp(-0.081)
 
 
 for (i in 1:N){ # loop through all households
-  set.seed(1234) # set seed to ensure replicability
   di <- rep(NA,T)
   Si <- rep(NA,T)
   Pai <- rep(NA,T)
