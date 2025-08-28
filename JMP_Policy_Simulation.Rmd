@@ -51,9 +51,6 @@ df$kid1age <- kid1age
 TT = 12 # A second child is born in TT+1 month
 kid2age <- c(rep(NA,T),rep(NA,TT),seq(1:(T-TT)))
 df$kid2age <- kid2age
-
-
-
 ```
 
 # Generate the secondary variables based on the basic variables
@@ -74,25 +71,38 @@ df$Y <- ifelse(df$YA %in% c(1,13,25,37),1,0)
 # Generate benefit 
 df <- df %>%
   mutate(logB = case_when(
-    NK1 == 0 & NK2to5 == 1 ~ 4.709530,
-    NK1 == 1 & NK2to5 == 0 ~ 5.017260,
-    NK1 == 0 & NK2to5 == 2 ~ 4.809471,
-    NK1 == 1 & NK2to5 == 1 ~ 5.091703,
+    NK1 == 0 & NK2to5 == 1 ~ log(100),
+    NK1 == 1 & NK2to5 == 0 ~ log(150),
+    NK1 == 0 & NK2to5 == 2 ~ log(130),
+    NK1 == 1 & NK2to5 == 1 ~ log(180),
   ))
 
 
+
 df$Q <- rep(rnorm(N),each = T) 
+
+# Set the utility parameters
+
+gamma0 <- -2.71849824
+gamma_logB <- 0.333741304
+gamma_pso <- -0.69188367
+gamma_LA <- 0.000546293
+gamma_edu <- -0.01911214
+
+beta0 <- 1.241452303
+beta_logB <- 0.148335799
+beta_pso <- -0.49505725
+beta_sh <- -0.36278896
+beta_sLA <- 0.010314497
+beta_edu <- 0.067525853
+
+sigma1 <- exp(0.454441558)
+sigma2 <- exp(-0.10685342)
+
 ```
 
 # Simulate take-up based on the basic and secondary variables
 ```{r}
-
-# Set the parameters
-sigma1 <- exp(0.495)
-sigma2 <- exp(-0.081)
-
-
-
 for (i in 1:N){ # loop through all households
   di <- rep(NA,T)
   Si <- rep(NA,T)
@@ -108,22 +118,22 @@ for (i in 1:N){ # loop through all households
   for (t in 1:T){
     pastd[t] <- d0 # record last period decision
     
-    Pai[t] <- pnorm(-3.945 + 
-                   0.610*X$logB[t] 
-                 - 0.755 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.001 * X$LA[t]
-                 - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pai[t] <- pnorm(gamma0 + 
+                   gamma_logB*X$logB[t] 
+                 + gamma_pso * ifelse(X$YA[t] > 12,1,0)
+                 + gamma_LA * X$LA[t]
+                 + gamma_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma1 * X$Q[t]
                  ) # record attention probability
     
     Si[t] <- max(1-d0, d0*X$Y[t])
       
-    Pci[t] <- pnorm(0.908 + 
-                   0.218*X$logB[t] 
-                 - 0.504 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.360 * Si[t]
-                 + 0.010 * Si[t] * X$LA[t]
-                 + 0.063 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pci[t] <- pnorm(beta0 + 
+                   beta_logB*X$logB[t] 
+                 + beta_pso * ifelse(X$YA[t] > 12,1,0)
+                 + beta_sh * Si[t]
+                 + beta_sLA * Si[t] * X$LA[t]
+                 + beta_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma2 * X$Q[t]
                  ) # record choice probability
     
@@ -142,7 +152,13 @@ for (i in 1:N){ # loop through all households
 
 sum(df$D)/dim(df)[1]
 
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
+
+df_NI <- df
 ```
+
 
 ```{r}
 hist(df$Pa,breaks = seq(0,1,0.05),main = "",xlab = "Attention Probability",cex.lab = 1.5,cex.axis=1.5)
@@ -168,9 +184,7 @@ Q_NI0 <- df$Q[df$D == 0]
 ```{r}
 #set.seed(1234) # set seed to ensure replicability
 #df$Q <- rep(rnorm(N),each = T) 
-# Set the parameters
-sigma1 <- exp(0.495)
-sigma2 <- exp(-0.081)
+
 
 
 for (i in 1:N){ # loop through all households
@@ -188,22 +202,22 @@ for (i in 1:N){ # loop through all households
   for (t in 1:T){
     pastd[t] <- d0 # record last period decision
     
-    Pai[t] <- pnorm(-3.945 + 
-                   0.610*X$logB[t] 
-                 - 0.755 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.001 * X$LA[t]
-                 - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pai[t] <- pnorm(gamma0 + 
+                   gamma_logB*X$logB[t] 
+                 + gamma_pso * ifelse(X$YA[t] > 12,1,0)
+                 + gamma_LA * X$LA[t]
+                 + gamma_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma1 * X$Q[t]
                  ) # record attention probability
     
     Si[t] <- max(1-d0, d0*X$Y[t])
       
-    Pci[t] <- pnorm(0.908 + 
-                   0.218*X$logB[t] 
-                 - 0.504 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.360 * Si[t]
-                 + 0.010 * Si[t] * X$LA[t]
-                 + 0.063 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pci[t] <- pnorm(beta0 + 
+                   beta_logB*X$logB[t] 
+                 + beta_pso * ifelse(X$YA[t] > 12,1,0)
+                 + beta_sh * Si[t]
+                 + beta_sLA * Si[t] * X$LA[t]
+                 + beta_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma2 * X$Q[t]
                  ) # record choice probability
     
@@ -221,15 +235,10 @@ for (i in 1:N){ # loop through all households
 }
 
 sum(df$D)/dim(df)[1]
-```
 
-```{r}
-mean(df$logB[df$D == 1])
-mean(df$NK1[df$D == 1])
-mean(df$YA[df$D == 1])
-mean(df$edu[df$D == 1])
-mean(df$LA[df$D == 1])
-mean(df$Q[df$D == 1])
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
 ```
 
 
@@ -239,9 +248,6 @@ mean(df$Q[df$D == 1])
 # Set random effect Q
 #df$Q <- rep(rnorm(N),each = T) 
 
-# Set the parameters
-sigma1 <- exp(0.495)
-sigma2 <- exp(-0.081)
 
 
 for (i in 1:N){ # loop through all households
@@ -259,22 +265,22 @@ for (i in 1:N){ # loop through all households
   for (t in 1:T){
     pastd[t] <- d0 # record last period decision
     
-    Pai[t] <- pnorm(-3.945 + 
-                   0.610 * X$logB[t] 
-                 - 0.755 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.001 * X$LA[t]
-                 - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pai[t] <- pnorm(gamma0 + 
+                   gamma_logB * X$logB[t] 
+                 + gamma_pso * ifelse(X$YA[t] > 12,1,0)
+                 + gamma_LA * X$LA[t]
+                 + gamma_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma1 * X$Q[t]
                  ) # record attention probability
     
     Si[t] <- max(1-d0, d0*X$Y[t])
       
-    Pci[t] <- pnorm(0.908 + 
-                   0.218 * X$logB[t] 
-                 - 0.504 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.360 * Si[t]
-                 + 0.010 * Si[t] * X$LA[t]
-                 + 0.063 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pci[t] <- pnorm(beta0 + 
+                   beta_logB * X$logB[t] 
+                 + beta_pso * ifelse(X$YA[t] > 12,1,0)
+                 + beta_sh * Si[t]
+                 + beta_sLA * Si[t] * X$LA[t]
+                 + beta_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma2 * X$Q[t]
                  ) # record choice probability
     
@@ -293,26 +299,24 @@ for (i in 1:N){ # loop through all households
 
 sum(df$D)/dim(df)[1]
 
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
 ```
 # More realistic policy counterfactual
 
-Finkelstein and Notowidigto (2019) shows that the attention raising policy likely has an upper bound of 30% for SNAP. We will use that as a benchmark for our counterfactual studies.
-
-Attention raising policy: one shot increase in attention by 30% after exit the program
-Choice inducing policy: increase choice probability by 1% for ten month when participating in the program and the child's age is between 1 to 30 month.
+We mimic the 
 
 
-# Attention raising by 30%
+# Attention raised to 100% when exit the program
 
 ```{r}
 #set.seed(1234) # set seed to ensure replicability
 # Set random effect Q
 #df$Q <- rep(c(-0.5,-0.4,-0.3,-0.2,-0.1),each = 3*3*10*T) # Let's help those with low thriftiness
 #df$Q <- rep(rnorm(N),each = T) 
-# Set the parameters
-sigma1 <- exp(0.495)
-sigma2 <- exp(-0.081)
 
+AB <- 1
 
 for (i in 1:N){ # loop through all households
   di <- rep(NA,T)
@@ -329,22 +333,22 @@ for (i in 1:N){ # loop through all households
   for (t in 1:T){
     pastd[t] <- d0 # record last period decision
     
-    Pai[t] <- pnorm(-3.945 + 
-                   0.610 * X$logB[t] 
-                 - 0.755 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.001 * X$LA[t]
-                 - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pai[t] <- pnorm(gamma0 + 
+                   gamma_logB * X$logB[t] 
+                 + gamma_pso * ifelse(X$YA[t] > 12,1,0)
+                 + gamma_LA * X$LA[t]
+                 + gamma_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma1 * X$Q[t]
                  ) # record attention probability
     
     Si[t] <- max(1-d0, d0*X$Y[t])
       
-    Pci[t] <- pnorm(0.908 + 
-                   0.218 * X$logB[t] 
-                 - 0.504 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.360 * Si[t]
-                 + 0.010 * Si[t] * X$LA[t]
-                 + 0.063 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pci[t] <- pnorm(beta0 + 
+                   beta_logB * X$logB[t] 
+                 + beta_pso * ifelse(X$YA[t] > 12,1,0)
+                 + beta_sh * Si[t]
+                 + beta_sLA * Si[t] * X$LA[t]
+                 + beta_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma2 * X$Q[t]
                  ) # record choice probability
     
@@ -353,7 +357,7 @@ for (i in 1:N){ # loop through all households
     if (t >= 2){ # The intervention will only be triggered when a household exits WIC
       if (X$pastD[t-1] == 1 & X$pastD[t] == 0){
         # print(c(i,t,Pai[t]))
-        Pai[t] <- min(Pai[t] + 0.3,1) # attention raise by 30%
+        Pai[t] <- min(Pai[t] + AB,1) 
         di[t] <- rbinom(1,1,Pai[t]) * rbinom(1,1,Pci[t]) 
         #print(c(i,t,Pai[t]))
       } else {
@@ -376,6 +380,12 @@ for (i in 1:N){ # loop through all households
 }
 
 sum(df$D)/dim(df)[1]
+
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
+
+sum(df$D[df$YA>12])/sum(df$YA>12)
+
+df_AB <- df
 ```
 
 ```{r}
@@ -389,6 +399,13 @@ mean(df$edu[df$D == 1])
 mean(df$LA[df$D == 1])
 mean(df$Q[df$D == 1])
 
+# sd(df$logB[df$D == 1])
+# sd(df$NK1[df$D == 1])
+# sd(df$YA[df$D == 1])
+# sd(df$edu[df$D == 1])
+# sd(df$LA[df$D == 1])
+# sd(df$Q[df$D == 1])
+
 Q_AR <- df$Q[df$D == 1]
 ```
 
@@ -400,10 +417,7 @@ Q_AR <- df$Q[df$D == 1]
 #df$Q <- rep(c(-0.5,-0.4,-0.3,-0.2,-0.1),each = 3*3*10*T) # Let's help those with low thriftiness
 #df$Q <- rep(rnorm(N),each = T) 
 
-# Set the parameters
-sigma1 <- exp(0.495)
-sigma2 <- exp(-0.081)
-
+CN <- 0.0333
 
 for (i in 1:N){ # loop through all households
   di <- rep(NA,T)
@@ -420,31 +434,31 @@ for (i in 1:N){ # loop through all households
   for (t in 1:T){
     pastd[t] <- d0 # record last period decision
     
-    Pai[t] <- pnorm(-3.945 + 
-                   0.610 * X$logB[t] 
-                 - 0.755 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.001 * X$LA[t]
-                 - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pai[t] <- pnorm(gamma0 + 
+                   gamma_logB * X$logB[t] 
+                 + gamma_pso * ifelse(X$YA[t] > 12,1,0)
+                 + gamma_LA * X$LA[t]
+                 + gamma_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma1 * X$Q[t]
                  ) # record attention probability
     
     Si[t] <- max(1-d0, d0*X$Y[t])
       
-    Pci[t] <- pnorm(0.908 + 
-                   0.218 * X$logB[t] 
-                 - 0.504 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.360 * Si[t]
-                 + 0.010 * Si[t] * X$LA[t]
-                 + 0.063 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pci[t] <- pnorm(beta0 + 
+                   beta_logB * X$logB[t] 
+                 + beta_pso * ifelse(X$YA[t] > 12,1,0)
+                 + beta_sh * Si[t]
+                 + beta_sLA * Si[t] * X$LA[t]
+                 + beta_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma2 * X$Q[t]
                  ) # record choice probability
     
     
   # choice inducing policy intervention
-    if (X$pastD[t] == 1 & X$YA[t] >= 1 & X$YA[t] <= 30){ 
+    if (X$pastD[t] == 1 & X$YA[t] <= 30){ 
       # The intervention will only be triggered when the household is in the program AND
       # YA is between the 1 to 30 month
-      Pci[t] <- min(Pci[t] + 0.01,1) # choice raise by 3%
+      Pci[t] <- min(Pci[t] + CN,1) # choice raise by 1%
       di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
       # print(c(i,t))
     } else {
@@ -464,8 +478,14 @@ for (i in 1:N){ # loop through all households
 
 sum(df$D)/dim(df)[1]
 
+sum(df$D[df$YA<=12])/sum(df$YA<=12)
 
+sum(df$D[df$YA>12])/sum(df$YA>12)
+
+df_CN <- df
 ```
+
+
 
 ```{r}
 hist(df$Pa,breaks = seq(0,1,0.05))
@@ -523,6 +543,49 @@ ggplot(plot_data, aes(x = Q, color = Group)) +
 mean(Q_NI > 0)
 mean(Q_AR > 0)
 mean(Q_CI > 0)
+
+```
+
+
+```{r}
+library(ggplot2)
+
+# Define color scheme
+cols <- c("NI" = "gray", "AR" = "blue", "CI" = "red")
+
+# Create combined dataframe (ordered by desired appearance)
+plot_data <- rbind(
+  data.frame(Q = Q_NI, Group = "NI"),
+  data.frame(Q = Q_AR, Group = "AR"),
+  data.frame(Q = Q_CI, Group = "CI")
+)
+
+
+ggplot(plot_data[plot_data$Group %in% c("NI", "CI"),], aes(x = Q, color = Group)) +
+  geom_density(linewidth = 1.5) +
+  scale_color_manual(
+    values = c("NI" = "gray", "CI" = "red"),
+    name = ""
+  ) +
+  labs(x = "Random effect Q", y = "Density") +
+  theme_minimal(base_size = 20) +
+  theme(
+    legend.position = 'top',
+    legend.key = element_blank(),  # Remove legend key background
+    legend.spacing.x = unit(0.5, 'cm')  # Add space between legend items
+  ) + xlim(-0.25,1.25) +
+  guides(color = guide_legend(
+    override.aes = list(
+      linetype = 1.5,
+      shape = 1,         # Absolutely no shapes
+      linewidth = 1,      # Line thickness
+      fill = NA,          # No fill
+      alpha = 1,          # No transparency
+      colour = c("red", "gray")  # Explicit colors
+    ),
+    keywidth = unit(1, "cm")  # Lengthen the legend lines
+  ))
+
 ```
 
 
@@ -542,7 +605,7 @@ base_plot <- ggplot() +
   scale_color_manual(values = cols) +
   labs(x = "Random effect Q", y = "Density") +
   theme_minimal(base_size = 20) +
-  xlim(-2, 3.5) + ylim(0, 0.8) +
+  xlim(-2, 3.5) + ylim(0, 0.7) +
   theme(legend.position = "none")
 
 # Build plots with explicit layer order
@@ -565,7 +628,11 @@ p3 <- base_plot +
     linewidth = 1.5
   )
 
-p4 <- base_plot +
+p4 <- base_plot +  
+  geom_rect(
+    aes(xmin = -0.2, xmax = 0.4, ymin = -Inf, ymax = Inf),
+    fill = "pink", alpha = 0.3, color = NA  # alpha controls transparency
+  ) +
   geom_density(
     data = subset(plot_data, Group == "NI"),
     aes(x = Q, color = Group),
@@ -580,7 +647,9 @@ p4 <- base_plot +
     data = subset(plot_data, Group == "CI"),
     aes(x = Q, color = Group),
     linewidth = 1.5
-  )
+  )  
+  # Add transparent pink rectangle for -1 < Q < 0.25
+  
 
 p2
 p3
@@ -589,8 +658,129 @@ p4
 # # Display plots
 # (p1 | p2) / (p3 | p4)
 ```
+```{r}
+library(dplyr)
+library(ggplot2)
 
-# Attention raising for those who never participated before to 100%
+# Step 1: compute max_consec per household, filter Q
+result_AB <- df_AB %>%
+  group_by(id) %>%
+  summarise(
+    max_consec = {
+      runs <- rle(D)
+      if (any(runs$values == 1)) {
+        max(runs$lengths[runs$values == 1])
+      } else {
+        0
+      }
+    },
+    Q_value = first(Q),
+    Pa_value = first(Pa),
+    .groups = "drop"
+  ) %>%
+  filter(Q_value >= -2, Q_value <= 2)
+
+# Step 2: bin Q for plotting
+result_AB <- result_AB %>%
+  mutate(
+    Q_bin = cut(
+      Q_value,
+      breaks = seq(-2, 2, by = 0.2),
+      include.lowest = TRUE,
+      right = FALSE
+    )
+  )
+
+
+# Step 1: compute max_consec per household, filter Q
+result_CN <- df_CN %>%
+  group_by(id) %>%
+  summarise(
+    max_consec = {
+      runs <- rle(D)
+      if (any(runs$values == 1)) {
+        max(runs$lengths[runs$values == 1])
+      } else {
+        0
+      }
+    },
+    Q_value = first(Q),
+    Pa_value = first(Pa),
+    .groups = "drop"
+  ) %>%
+  filter(Q_value >= -2, Q_value <= 2)
+
+# Step 2: bin Q for plotting
+result_CN <- result_CN %>%
+  mutate(
+    Q_bin = cut(
+      Q_value,
+      breaks = seq(-2, 2, by = 0.2),
+      include.lowest = TRUE,
+      right = FALSE
+    )
+  )
+
+# Kernel regression plot
+plot(
+  ksmooth(result_CN$Q_value, result_CN$max_consec, kernel = "normal", bandwidth = 0.2),
+  type = "l", col = "red", lwd = 5,
+  xlim = c(-2, 2), ylim = c(0, 30),
+  xlab = "Random effect Q", ylab = "Consecutive participation",
+  cex.lab = 1.5
+)
+lines(
+  ksmooth(result_AB$Q_value, result_AB$max_consec, kernel = "normal", bandwidth = 0.2),
+  col = "blue", lwd = 5
+)
+legend("bottomright", legend = c("Choice nudge", "Attention boost"), col = c("red", "blue"), lwd = 2)
+# par(new=TRUE)
+# plot(df_NI$Q,df_NI$Pa,xlim = c(-2,2),yaxt = "n",pch = 2,ylab = "",xlab ="",cex = 0.1,col = "blue")
+# axis(4)
+# par(new=TRUE)
+# plot(df_NI$Q,df_NI$Pc,xlim = c(-2,2),yaxt = "n",pch = 2,ylab = "",xlab ="",cex = 0.1)
+
+# plot(df_CN$Q,df_CN$Pa) # same as plot(df_NI$Q,df_NI$Pa)
+```
+
+```{r}
+# Set up the plot area
+par(mar = c(5, 4, 4, 4) + 0.1)  # Extra space for right y-axis
+
+# First plot (Pa - left y-axis)
+plot(df_NI$Q, df_NI$Pa, 
+     xlim = c(-2, 2), ylim = c(0, 1),
+     pch = 2, cex = 0.25, col = "blue",
+     xlab = "Random Effect (Q)", ylab = "Probability",
+     cex.lab = 1.5,
+     main = "")
+
+# Add transparent pink rectangle for -1 < Q < 0.25
+rect(-0.2, -0.1, 0.4, 1.1, 
+     col = adjustcolor("pink", alpha.f = 0.5), border = NA)
+
+# Redraw points to ensure they're visible
+points(df_NI$Q, df_NI$Pa, pch = 2, cex = 0.25, col = "blue")
+
+# Second plot (Pc - right y-axis)
+par(new = TRUE)
+plot(df_NI$Q, df_NI$Pc, 
+     xlim = c(-2, 2), ylim = c(0, 1),
+     axes = FALSE, pch = 1, cex = 0.5, col = "red",
+     xlab = "", ylab = "")
+
+# Add right y-axis
+# axis(4)
+# mtext("Choice Probability (Pc)", side = 4, line = 3)
+
+# Add legend
+legend("bottomright", 
+       legend = c("Attention (Pa)", "Choice (Pc)"),
+       pch = c(2, 1), col = c("blue", "red"),
+       bg = "white")
+```
+
+# Attention raising for everyone by 30% in period 1
 
 This resembles the intervention by Finkelstein and Notowidigto (2019).
 It might be too expensive for WIC to implement this policy, though.
@@ -598,9 +788,7 @@ It might be too expensive for WIC to implement this policy, though.
 ```{r}
 #set.seed(1234) # set seed to ensure replicability
 #df$Q <- rep(rnorm(N),each = T) 
-# Set the parameters
-sigma1 <- exp(0.495)
-sigma2 <- exp(-0.081)
+
 
 
 for (i in 1:N){ # loop through all households
@@ -618,29 +806,29 @@ for (i in 1:N){ # loop through all households
   for (t in 1:T){
     pastd[t] <- d0 # record last period decision
     
-    Pai[t] <- pnorm(-3.945 + 
-                   0.610 * X$logB[t] 
-                 - 0.755 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.001 * X$LA[t]
-                 - 0.027 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pai[t] <- pnorm(gamma0 + 
+                   gamma_logB * X$logB[t] 
+                 + gamma_pso * ifelse(X$YA[t] > 12,1,0)
+                 + gamma_LA * X$LA[t]
+                 + gamma_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma1 * X$Q[t]
                  ) # record attention probability
     
     Si[t] <- max(1-d0, d0*X$Y[t])
       
-    Pci[t] <- pnorm(0.908 + 
-                   0.218*X$logB[t] 
-                 - 0.504 * ifelse(X$YA[t] > 12,1,0)
-                 - 0.360 * Si[t]
-                 + 0.010 * Si[t] * X$LA[t]
-                 + 0.063 * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+    Pci[t] <- pnorm(beta0 + 
+                   beta_logB*X$logB[t] 
+                 + beta_pso * ifelse(X$YA[t] > 12,1,0)
+                 + beta_sh * Si[t]
+                 + beta_sLA * Si[t] * X$LA[t]
+                 + beta_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
                  + sigma2 * X$Q[t]
                  ) # record choice probability
     
     # intervene when the household has never participated before
     if(t == 1){
       Pai[t] <- Pai[t] + 0.3
-      Pci[t] <- Pci[t] + 0.07
+      Pci[t] <- Pci[t] 
       di[t] <- rbinom(1,1,min(Pai[t],1)) * rbinom(1,1,min(Pci[t],1))
     } else {
       di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
@@ -712,5 +900,8 @@ ggplot(plot_data0, aes(x = Q, color = Group)) +
     keywidth = unit(1, "cm")  # Lengthen the legend lines
   ))
 ```
+
+
+
 
 
