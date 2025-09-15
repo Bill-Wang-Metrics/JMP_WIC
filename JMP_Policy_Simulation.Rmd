@@ -745,8 +745,7 @@ legend("bottomright", legend = c("Choice nudge", "Attention boost"), col = c("re
 
 ```{r}
 # Set up the plot area
-par(mar = c(5, 4, 4, 4) + 0.1)  # Extra space for right y-axis
-
+par(mar = c(5.1, 4.1, 2.1, 4.1))
 # First plot (Pa - left y-axis)
 plot(df_NI$Q, df_NI$Pa, 
      xlim = c(-2, 2), ylim = c(0, 1),
@@ -778,6 +777,8 @@ legend("bottomright",
        legend = c("Attention (Pa)", "Choice (Pc)"),
        pch = c(2, 1), col = c("blue", "red"),
        bg = "white")
+
+par(mar = c(5.1, 4.1, 4.1, 2.1))
 ```
 
 # Attention raising for everyone by 30% in period 1
@@ -901,7 +902,149 @@ ggplot(plot_data0, aes(x = Q, color = Group)) +
   ))
 ```
 
+# Sensitivity for choice nudging prob increase
+```{r}
+#set.seed(1234) # set seed to ensure replicability
+# Set random effect Q
+#df$Q <- rep(c(-0.5,-0.4,-0.3,-0.2,-0.1),each = 3*3*10*T) # Let's help those with low thriftiness
+#df$Q <- rep(rnorm(N),each = T) 
+
+cn <- seq(0,0.0333,0.0009)
+
+rate_cn <- rep(NA,length(cn))
+
+counter = 0
+
+for (CN in cn){
+  counter = counter + 1
+  
+  for (i in 1:N){ # loop through all households
+  di <- rep(NA,T)
+  Si <- rep(NA,T)
+  Pai <- rep(NA,T)
+  Pci <- rep(NA,T)
+  pastd <- rep(NA,T)
+  
+  X <- df[df$id==i,]
+  
+  d0 = 0 # initial condition 0
+  
+  # Simulate decisions sequentially
+  for (t in 1:T){
+    pastd[t] <- d0 # record last period decision
+    
+    Pai[t] <- pnorm(gamma0 + 
+                   gamma_logB * X$logB[t] 
+                 + gamma_pso * ifelse(X$YA[t] > 12,1,0)
+                 + gamma_LA * X$LA[t]
+                 + gamma_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+                 + sigma1 * X$Q[t]
+                 ) # record attention probability
+    
+    Si[t] <- max(1-d0, d0*X$Y[t])
+      
+    Pci[t] <- pnorm(beta0 + 
+                   beta_logB * X$logB[t] 
+                 + beta_pso * ifelse(X$YA[t] > 12,1,0)
+                 + beta_sh * Si[t]
+                 + beta_sLA * Si[t] * X$LA[t]
+                 + beta_edu * X$edu[t] * ifelse(X$YA[t] > 12,1,0)
+                 + sigma2 * X$Q[t]
+                 ) # record choice probability
+    
+    
+    # choice inducing policy intervention
+      if (X$pastD[t] == 1 & X$YA[t] <= 30){ 
+        # The intervention will only be triggered when the household is in the program AND
+        # YA is between the 1 to 30 month
+        Pci[t] <- min(Pci[t] + CN,1) # choice raise by 1%
+        di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
+        # print(c(i,t))
+      } else {
+        di[t] <- rbinom(1,1,Pai[t]^(1-d0)) * rbinom(1,1,Pci[t])
+      }
+      
+      d0 <- di[t] # update the "initial condition"
+    } 
+    
+    # fill in the data for df
+    df$pastD[df$id==i] <- pastd
+    df$D[df$id==i] <- di
+    df$Pa[df$id==i] <- Pai
+    df$Pc[df$id==i] <- Pci
+    df$S[df$id==i] <- Si
+  }
+  
+  # sum(df$D[df$YA<=12])/sum(df$YA<=12)
+  # 
+  # sum(df$D[df$YA>12])/sum(df$YA>12)
+  
+  rate_cn[counter] <- sum(df$D)/dim(df)[1]
+}
 
 
+```
+
+# Plot the sensitivity analysis
+```{r}
+rate_ni <- 0.4693778
+rate_ab <- 0.4747111
+rate_CN <- 0.4930963
+
+# Load the required packages
+library(scales)
+library(ggplot2) # Just for the alpha function to make transparent colors
+
+par(mar = c(5.1, 4.1, 2.1, 2.1))
+# 1. Create a scatter plot of the raw data points for Choice Nudging
+plot(cn, rate_cn,
+     pch = 19,        
+     col = "black",   
+     xaxt = 'n', # Suppress the default x-axis
+     xlab = "Intensity of Choice-Nudging Policy", 
+     ylab = "Predicted Take-up Rate",
+     cex.lab = 1.5
+     # main = "Effectiveness of Policy Interventions"
+)
+
+# 2. Create custom x-axis with percentage labels
+axis(1, at = cn, labels = percent(cn))
+
+# 3. Fit a linear model and calculate confidence intervals
+cn_trend <- lm(rate_cn ~ cn)
+newdata <- data.frame(cn = seq(min(cn), max(cn), length.out = 100))
+conf_int <- predict(cn_trend, newdata = newdata, interval = "confidence", level = 0.95)
+
+# 4. Plot the confidence interval as a transparent blue band
+polygon(x = c(newdata$cn, rev(newdata$cn)), 
+        y = c(conf_int[, "lwr"], rev(conf_int[, "upr"])),
+        col = alpha("red", 0.2), border = NA)
+
+# 5. Add the fitted trend line
+abline(cn_trend, col = "red", lwd = 4)
+
+# 6. Add the horizontal line for the Attention-Boosting policy
+abline(h = rate_ab, col = "blue", lwd = 4, lty = 2)
+
+# Find intersection points (if they exist)
+x_upper <- NULL
+x_lower <- NULL
+
+# 8. Add a legend
+legend("topleft", 
+       legend = c("Choice-Nudging (Data)", 
+                  "Choice-Nudging (Trend)", 
+                  # "95% Confidence Interval",
+                  "Attention-Boosting"
+                  #"CI Intersection Points"
+                  ),
+       col = c("black", "red", "blue"),
+       pch = c(19, NA, NA),
+       lwd = c(NA, 2, 2), 
+       lty = c(NA, 1, 2),
+       pt.cex = c(1, NA, NA))
+
+par(mar = c(5.1, 4.1, 4.1, 2.1))
+```
 
 
